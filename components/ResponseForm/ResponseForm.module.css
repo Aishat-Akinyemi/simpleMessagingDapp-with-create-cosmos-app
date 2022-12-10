@@ -1,0 +1,16 @@
+.response-container {
+  border: 3px solid whitesmoke;
+  margin: auto;
+  padding: 2em;
+}
+
+.response-button {
+  text-align: center;
+}
+
+#reply-input {
+  border: 3px solid aqua;
+  border-radius: 5px;
+  padding: 10px;
+  margin: 2em;
+}

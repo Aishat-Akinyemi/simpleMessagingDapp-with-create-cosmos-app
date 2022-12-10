@@ -1,0 +1,258 @@
+import Head from "next/head";
+import {
+  Box,
+  Divider,
+  Grid,
+  Heading,
+  Text,
+  Stack,
+  Container,
+  Link,
+  Button,
+  Flex,
+  Icon,
+  useColorMode,
+  useToast
+} from "@chakra-ui/react";
+import { BsFillMoonStarsFill, BsFillSunFill } from "react-icons/bs";
+
+import { useWallet } from "@cosmos-kit/react";
+
+import { messagingContractAddress, chainRpcEndpoint } from "../config";
+import {
+  WalletSection,
+  handleChangeColorModeValue,
+} from "../components";
+import ResponseForm from "../components/ResponseForm";
+import ResponseList from "../components/ResponseList";
+import { useEffect, useState } from "react";
+import { GetGreetingResponse, GetRepliesResponse } from "../codegen/Messaging.types";
+import { MessagingClient, MessagingQueryClient } from "../codegen/Messaging.client";
+import { CosmWasmClient } from "@cosmjs/cosmwasm-stargate";
+
+const library = {
+  title: "Telescope",
+  text: "telescope",
+  href: "https://github.com/cosmology-tech/interchain",
+};
+
+export default function Home() {
+  const { colorMode, toggleColorMode } = useColorMode();
+  const { getSigningCosmWasmClient, address, isWalletConnected, username } = useWallet();  
+  const [greeting, setGreeting] = useState<GetGreetingResponse | null>(null)
+  const [replies, setReplies] = useState<GetRepliesResponse | null>(null);
+  const [response, setResponse] = useState<string | null>(null);
+  const [signingClient, setSigningClient] = useState<MessagingClient | null>(null);
+  const [isAlreadyReplied, setIsAlreadyReplied] = useState<boolean>(false);
+  const toast = useToast();
+
+  const messagingQueryClient = (async () => {
+    let client = null; 
+    try {
+      const cw = await CosmWasmClient.connect(chainRpcEndpoint!);
+      client =  new MessagingQueryClient(cw, messagingContractAddress);
+    } catch(e: any) {
+      toast({
+        title: 'Error Connecting. Check your internet connection.',
+        description: e.messgage,
+        status: 'error',
+        duration: 1000,
+        isClosable: true,
+      })
+    }
+    return client;  
+  })();
+
+  const getAndSetGreeting = async () => {
+    let greetingResponse = null;
+     greetingResponse = await (await messagingQueryClient)?.getGreeting();
+     if(greetingResponse){
+        if(username) {
+          const personalisedResponse: GetGreetingResponse = { greeting: `${greetingResponse.greeting}, ${username}`}
+          setGreeting(personalisedResponse);      
+        } else{      
+          setGreeting(greetingResponse);
+        }
+     }
+   
+  }
+  
+  const getAndSetReplies = async () => {
+    const replyResponse = await (await messagingQueryClient)?.getReplies();
+    if(replyResponse){
+      setReplies(await replyResponse);    
+      checkUserAlreadyReplied();
+    }
+  }
+
+  useEffect(() => {
+    getAndSetGreeting()
+    getAndSetReplies()    
+  }, [])
+
+  const getAndSetSigningClient = async () => {
+      try{
+          if(isWalletConnected &&address){
+            const cwsc = await getSigningCosmWasmClient();        
+            setSigningClient(new MessagingClient(cwsc!, address, messagingContractAddress));        
+        } else {
+          toast({
+            title: 'Wallet is not connected.',
+            status: 'error',
+            duration: 2000,
+            isClosable: true,
+          })
+        }
+      } catch(e:any) {
+        toast({
+          title: 'Error Connecting. Check your internet connection.',
+          status: 'error',
+          duration: 2000,
+          isClosable: true,
+        });
+      }
+  }
+
+  const checkUserAlreadyReplied = ()=> {
+    if (!address) {
+      return;
+    } 
+    const index = replies?.reply_list.find(reply => reply.add === address );
+    if (index) {
+      console.log(index);
+      setIsAlreadyReplied(true);
+    } else {
+      console.log(index);
+      setIsAlreadyReplied(false);
+    }
+  }
+
+  useEffect(() => {      
+    getAndSetSigningClient();
+    getAndSetGreeting();    
+    checkUserAlreadyReplied();
+  }, [address])
+ 
+  const submit = async (reply: string) => { 
+      if(!isAlreadyReplied) {
+        const msg = { text: reply}  
+        try{
+          toast({
+            title: 'Submitting Response...',
+            status: 'info',
+            duration: 5000,
+            isClosable: true,
+          })
+          await signingClient?.reply(msg, "auto"); 
+          toast({
+            title: 'Successfully submitted response.',
+            status: 'success',
+            duration: 5000,
+            isClosable: true,
+          })         
+          getAndSetReplies();
+        } catch (err: any) {
+          toast({
+            title: 'Failed to submit Response.',
+            description: err.message,
+            status: 'error',
+            duration: 9000,
+            isClosable: true,
+          })
+        }finally {
+        }
+      }
+  }
+
+    
+  return (
+    <Container maxW="5xl" py={10}>
+      <Head>
+        <title>Simple Messaging dApp</title>
+        <meta name="description" content="Generated by create cosmos app" />
+        <link rel="icon" href="/favicon.ico" />
+      </Head>
+      <Flex justifyContent="end" mb={4}>
+        <Button variant="outline" px={0} onClick={toggleColorMode}>
+          <Icon
+            as={colorMode === "light" ? BsFillMoonStarsFill : BsFillSunFill}
+          />
+        </Button>
+      </Flex>
+      <Box textAlign="center">
+        <Heading
+          as="h1"
+          fontSize={{ base: "3xl", sm: "4xl", md: "5xl" }}
+          fontWeight="extrabold"
+          mb={3}
+        >
+          Simple Messaging dApp
+        </Heading>
+        <Heading
+          as="h1"
+          fontWeight="bold"
+          fontSize={{ base: "2xl", sm: "3xl", md: "4xl" }}
+        >          
+          <Text
+            as="span"
+            color={handleChangeColorModeValue(
+              colorMode,
+              "primary.500",
+              "primary.200"
+            )}
+          >
+           {greeting?.greeting}
+          </Text>
+        </Heading>
+      </Box>
+
+      <WalletSection />
+
+
+      <Box mb={3}>
+        <Divider />
+      </Box>
+
+      
+      <Box mb={3} w="full" maxW="md" mx="auto">
+        <ResponseForm 
+              isConnectWallet={isWalletConnected} 
+              submit={submit}
+              isAlreadyReplied={isAlreadyReplied}
+        />
+      </Box>
+
+      
+      <Box mb={3}>
+        <Divider />
+      </Box>
+
+      
+      <Box w="full" maxW="md" mx="auto">
+        <ResponseList replies={replies} isLoading={false} error={null} />
+      </Box>
+
+      
+
+      <Box mb={3}>
+        <Divider />
+      </Box>
+      <Stack
+        isInline={true}
+        spacing={1}
+        justifyContent="center"
+        opacity={0.5}
+        fontSize="sm"
+      >
+        <Text>Built with</Text>
+        <Link
+          href="https://cosmology.tech/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Cosmology
+        </Link>
+      </Stack>
+    </Container>
+  );
+}

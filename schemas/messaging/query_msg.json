@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "QueryMsg",
+  "anyOf": [
+    {
+      "type": "object",
+      "required": [
+        "get_greeting"
+      ],
+      "properties": {
+        "get_greeting": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_replies"
+      ],
+      "properties": {
+        "get_replies": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
+}
